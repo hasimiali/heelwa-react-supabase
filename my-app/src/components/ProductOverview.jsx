@@ -3,6 +3,8 @@ import { supabase } from "../supabaseClient";
 import { useEffect, useState } from "react";
 import { StarIcon } from "@heroicons/react/20/solid";
 
+import CustomerAlsoPurchased from "./CustomerAlsoPurchased";
+
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
 }
@@ -94,35 +96,24 @@ export default function ProductOverview() {
           </ol>
         </nav>
 
-        {/* Image gallery */}
-        <div className="mx-auto mt-6 max-w-2xl sm:px-6 lg:grid lg:max-w-7xl lg:grid-cols-3 lg:gap-8 lg:px-8">
-          {images[0] && (
-            <img
-              src={images[0].image_url}
-              className="row-span-2 size-full rounded-lg object-cover max-lg:hidden aspect-3/4"
-            />
-          )}
-
-          {images[1] && (
-            <img
-              src={images[1].image_url}
-              className="col-start-2 size-full rounded-lg object-cover max-lg:hidden aspect-3/2"
-            />
-          )}
-
-          {images[2] && (
-            <img
-              src={images[2].image_url}
-              className="col-start-2 row-start-2 size-full rounded-lg object-cover max-lg:hidden aspect-3/2"
-            />
-          )}
-
-          {images[3] && (
-            <img
-              src={images[3].image_url}
-              className="row-span-2 size-full object-cover sm:rounded-lg lg:aspect-3/4 aspect-4/5"
-            />
-          )}
+        {/* Image gallery (horizontal scroll, same size) */}
+        <div className="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-4">
+            {images.map((img) => (
+              <div
+                key={img.id}
+                className="snap-start shrink-0 w-[80%] sm:w-[45%] lg:w-[30%]"
+              >
+                <div className="aspect-[3/4] overflow-hidden rounded-xl bg-gray-100">
+                  <img
+                    src={img.image_url}
+                    alt={product.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Product info */}
@@ -137,31 +128,23 @@ export default function ProductOverview() {
           <div className="mt-4 lg:row-span-3 lg:mt-0">
             <p className="text-3xl tracking-tight text-gray-900">{price}</p>
 
-            {/* Reviews dummy */}
-            <div className="mt-6 flex items-center">
-              {[0, 1, 2, 3, 4].map((idx) => (
-                <StarIcon
-                  key={idx}
-                  className={classNames(
-                    idx < 4 ? "text-gray-900" : "text-gray-200",
-                    "size-5"
-                  )}
-                />
-              ))}
-              <span className="ml-3 text-sm text-indigo-600">117 reviews</span>
-            </div>
-
             {/* Colors */}
             <div className="mt-10">
-              <h3 className="text-sm font-medium text-gray-900">Color</h3>
               <div className="flex gap-x-3 mt-4">
-                {colors.map((color) => (
-                  <div
-                    key={color}
-                    className="size-8 rounded-full border border-gray-300"
-                    style={{ backgroundColor: color }}
-                  ></div>
-                ))}
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-900">Variant</h3>
+
+                  <div className="flex flex-wrap gap-2">
+                    {colors.map((color) => (
+                      <span
+                        key={color}
+                        className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700"
+                      >
+                        {color}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -195,23 +178,10 @@ export default function ProductOverview() {
           {/* Description */}
           <div className="py-10 lg:col-span-2 lg:border-r lg:border-gray-200 lg:pr-8 lg:pt-6">
             <p className="text-base text-gray-900">{product.description}</p>
-
-            <div className="mt-10">
-              <h3 className="text-sm font-medium text-gray-900">Highlights</h3>
-              <ul className="list-disc pl-4 mt-4 space-y-2 text-sm text-gray-600">
-                {product.highlights?.map((h) => (
-                  <li key={h}>{h}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="mt-10">
-              <h3 className="text-sm font-medium text-gray-900">Details</h3>
-              <p className="mt-4 text-sm text-gray-600">{product.details}</p>
-            </div>
           </div>
         </div>
       </div>
+      <CustomerAlsoPurchased />
     </div>
   );
 }

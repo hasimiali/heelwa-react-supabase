@@ -205,16 +205,17 @@ export default function Navbar() {
           New In
         </Link>
 
-        {leftCategories.map((menu) => renderCategoryMenu(menu, whiteMode))}
-
-        <Link
-          to="/"
-          className={`text-xl font-bold ${
-            whiteMode ? "text-black" : "text-white"
-          }`}
-        >
-          MAHDALY
+        <Link to="/" className="flex items-center">
+          <img
+            src="/images/logos/heelwa.png"
+            alt="Heelwa Logo"
+            className={`h-12 w-auto transition ${
+              whiteMode ? "" : "brightness-0 invert"
+            }`}
+          />
         </Link>
+
+        {leftCategories.map((menu) => renderCategoryMenu(menu, whiteMode))}
 
         {rightCategories.map((menu) => renderCategoryMenu(menu, whiteMode))}
       </div>

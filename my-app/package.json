@@ -16,6 +16,11 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/supabase-js": "^2.79.0",
     "@tailwindcss/vite": "^4.1.16",
+    "adm-zip": "^0.5.16",
+    "fs-extra": "^11.3.3",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.561.0",
+    "papaparse": "^5.5.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.5"
