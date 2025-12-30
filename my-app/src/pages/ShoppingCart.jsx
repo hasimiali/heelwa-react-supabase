@@ -1,132 +1,256 @@
-import { useNavigate } from "react-router-dom";
+"use client";
 
-'use client'
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient";
 
 export default function ShoppingCart() {
+  const navigate = useNavigate();
 
-  const navigate = useNavigate();   // ← WAJIB ADA
+  const [cartItems, setCartItems] = useState([]);
+  const [keepItems, setKeepItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const products = [
-    {
-      id: 1,
-      name: 'Basic Tee', 
-      color: 'Sienna',
-      size: 'Large',
-      price: 32,
-      inStock: true,
-      imageSrc:
-        'https://tailwindcss.com/plus-assets/img/ecommerce-images/shopping-cart-page-04-product-01.jpg',
-    },
-    {
-      id: 2,
-      name: 'Basic Tee',
-      color: 'Black',
-      size: 'Large',
-      price: 32,
-      inStock: false,
-      leadTime: 'Ships in 3–4 weeks',
-      imageSrc:
-        'https://tailwindcss.com/plus-assets/img/ecommerce-images/shopping-cart-page-04-product-03.jpg',
-    },
-    {
-      id: 3,
-      name: 'Nomad Tumbler',
-      color: 'White',
-      price: 35,
-      size: null,
-      inStock: true,
-      imageSrc:
-        'https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-04-image-card-02.jpg',
-    },
-  ]
+  // ==========================
+  // LOAD CART
+  // ==========================
+  useEffect(() => {
+    loadCart();
+  }, []);
 
-  const subtotal = products.reduce((sum, p) => sum + p.price, 0)
-  const shipping = 5
-  const tax = 8.32
-  const total = subtotal + shipping + tax
+  async function loadCart() {
+    setLoading(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setCartItems([]);
+      setKeepItems([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data: userCart } = await supabase
+      .from("carts")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!userCart) {
+      setCartItems([]);
+      setKeepItems([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data: items } = await supabase
+      .from("cart_items")
+      .select(
+        `
+        id,
+        quantity,
+        keep,
+        product_variants (
+          color,
+          size,
+          price,
+          stock_quantity,
+          products (
+            name,
+            product_images ( image_url, is_primary )
+          )
+        )
+      `
+      )
+      .eq("cart_id", userCart.id);
+
+    const cart = [];
+    const keep = [];
+
+    items.forEach((item) => {
+      const images = item.product_variants.products.product_images || [];
+      const image =
+        images.find((i) => i.is_primary)?.image_url ||
+        images[0]?.image_url ||
+        "";
+
+      const formatted = {
+        id: item.id,
+        name: item.product_variants.products.name,
+        color: item.product_variants.color,
+        size: item.product_variants.size,
+        price: Number(item.product_variants.price),
+        quantity: item.quantity,
+        keep: item.keep,
+        imageSrc: image,
+      };
+
+      cart.push(formatted);
+      if (item.keep) keep.push(formatted);
+    });
+
+    setCartItems(cart);
+    setKeepItems(keep);
+    setLoading(false);
+  }
+
+  // ==========================
+  // KEEP (LOCKED)
+  // ==========================
+  async function toggleKeep(id) {
+    if (keepItems.length >= 3) {
+      alert("Maksimal 3 item untuk dicoba");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Item yang ditambahkan ke Keep tidak bisa diubah atau dihapus.\n\nLanjutkan?"
+    );
+
+    if (!confirmed) return;
+
+    await supabase.from("cart_items").update({ keep: true }).eq("id", id);
+    loadCart();
+  }
+
+  // ==========================
+  // TOTAL (EXCLUDE KEEP)
+  // ==========================
+  const subtotal = cartItems
+    .filter((i) => !i.keep)
+    .reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+  const shipping = subtotal > 0 ? 25000 : 0;
+  const tax = subtotal * 0.1;
+  const total = subtotal + shipping + tax;
+
+  if (loading) {
+    return <p className="pt-32 text-center">Loading cart...</p>;
+  }
 
   return (
     <div className="bg-white">
-      <div className="pt-28 mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Shopping Cart</h1>
+      <div className="pt-28 mx-auto max-w-7xl px-4 py-16 lg:px-8">
+        <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
 
         <div className="mt-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* ---------------- LEFT COLUMN: PRODUCTS ---------------- */}
+          {/* CART */}
           <div className="lg:col-span-8">
-            <ul role="list" className="divide-y divide-gray-200 border-t border-gray-200">
-              {products.map((product) => (
-                <li key={product.id} className="flex py-8">
+            <ul className="divide-y border-t">
+              {cartItems.map((p) => (
+                <li key={p.id} className="flex py-8">
                   <img
-                    src={product.imageSrc}
-                    alt={product.name}
-                    className="h-24 w-24 rounded-md border border-gray-200 object-cover"
+                    src={p.imageSrc}
+                    className="h-24 w-24 rounded-md border object-cover"
                   />
 
-                  <div className="ml-4 flex flex-1 flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between text-base font-medium text-gray-900">
-                        <h3>{product.name}</h3>
-                        <p>${product.price.toFixed(2)}</p>
-                      </div>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {product.color} {product.size ? `· ${product.size}` : ''}
-                      </p>
-
-                      {product.inStock ? (
-                        <p className="mt-2 text-sm text-green-600">● In stock</p>
-                      ) : (
-                        <p className="mt-2 text-sm text-gray-500">⏳ {product.leadTime}</p>
+                  <div className="ml-4 flex flex-1 flex-col">
+                    <div className="flex justify-between font-medium">
+                      <h3>{p.name}</h3>
+                      {!p.keep && (
+                        <p>
+                          Rp {(p.price * p.quantity).toLocaleString("id-ID")}
+                        </p>
                       )}
                     </div>
 
-                    <button className="mt-4 text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                      Remove
-                    </button>
+                    <p className="text-sm text-gray-500">
+                      {p.color}
+                      {p.size ? ` · ${p.size}` : ""}
+                    </p>
+
+                    <label className="mt-3 flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={p.keep}
+                        disabled={p.keep}
+                        onChange={() => toggleKeep(p.id)}
+                      />
+                      Keep (Try later)
+                    </label>
+
+                    {p.keep && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Item terkunci
+                      </p>
+                    )}
                   </div>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* ---------------- RIGHT COLUMN: ORDER SUMMARY ---------------- */}
+          {/* SUMMARY */}
           <div className="lg:col-span-4">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-6">
-              <h2 className="text-lg font-medium text-gray-900">Order summary</h2>
+            <div className="rounded-lg border bg-gray-50 p-6">
+              <h2 className="font-medium">Order summary</h2>
 
-              <dl className="mt-6 space-y-4">
+              <div className="mt-6 space-y-4">
                 <div className="flex justify-between">
-                  <dt className="text-gray-600">Subtotal</dt>
-                  <dd className="font-medium text-gray-900">${subtotal.toFixed(2)}</dd>
-                </div>
-
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Shipping estimate</dt>
-                  <dd className="font-medium text-gray-900">${shipping.toFixed(2)}</dd>
+                  <span>Subtotal</span>
+                  <span>Rp {subtotal.toLocaleString("id-ID")}</span>
                 </div>
 
                 <div className="flex justify-between">
-                  <dt className="text-gray-600">Tax estimate</dt>
-                  <dd className="font-medium text-gray-900">${tax.toFixed(2)}</dd>
+                  <span>Shipping</span>
+                  <span>Rp {shipping.toLocaleString("id-ID")}</span>
                 </div>
 
-                <div className="flex justify-between border-t border-gray-200 pt-4">
-                  <dt className="text-base font-medium text-gray-900">Order total</dt>
-                  <dd className="text-base font-semibold text-gray-900">
-                    ${total.toFixed(2)}
-                  </dd>
+                <div className="flex justify-between">
+                  <span>Tax (10%)</span>
+                  <span>Rp {tax.toLocaleString("id-ID")}</span>
                 </div>
-              </dl>
+
+                <div className="flex justify-between border-t pt-4 font-semibold">
+                  <span>Total</span>
+                  <span>Rp {total.toLocaleString("id-ID")}</span>
+                </div>
+              </div>
 
               <button
+                disabled={subtotal === 0}
                 onClick={() => navigate("/checkout")}
-                className="mt-6 w-full rounded-md bg-indigo-600 py-3 text-center text-white font-medium hover:bg-indigo-700"
+                className="mt-6 w-full rounded bg-indigo-600 py-3 text-white disabled:opacity-50"
               >
                 Checkout
               </button>
             </div>
           </div>
         </div>
+
+        {/* KEEP SECTION */}
+        {keepItems.length > 0 && (
+          <div className="mt-20">
+            <h2 className="text-2xl font-bold">
+              Keep (Try Later) {keepItems.length}/3
+            </h2>
+
+            <ul className="mt-6 divide-y border-t">
+              {keepItems.map((p) => (
+                <li key={p.id} className="flex py-8 opacity-80">
+                  <img
+                    src={p.imageSrc}
+                    className="h-24 w-24 rounded-md border object-cover"
+                  />
+
+                  <div className="ml-4">
+                    <h3 className="font-medium">{p.name}</h3>
+                    <p className="text-sm text-gray-500">
+                      {p.color}
+                      {p.size ? ` · ${p.size}` : ""}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Item ini tidak dapat diubah
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }

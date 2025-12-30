@@ -6,7 +6,7 @@ export default function AdminDashboard() {
       <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {/* Card Brand */}
+        {/* Brand */}
         <Link
           to="/admin/brands"
           className="border rounded-xl p-6 shadow hover:bg-gray-50 transition"
@@ -17,6 +17,7 @@ export default function AdminDashboard() {
           </p>
         </Link>
 
+        {/* Categories */}
         <Link
           to="/admin/categories"
           className="border rounded-xl p-6 shadow hover:bg-gray-50 transition"
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
           </p>
         </Link>
 
+        {/* Products */}
         <Link
           to="/admin/product"
           className="border rounded-xl p-6 shadow hover:bg-gray-50 transition"
@@ -37,12 +39,16 @@ export default function AdminDashboard() {
           </p>
         </Link>
 
-        {/* nanti tambah card lain di sini
-          - Categories
-          - Products
-          - Variants
-          - Orders
-        */}
+        {/* 🆕 USER CART MANAGEMENT */}
+        <Link
+          to="/admin/usercart"
+          className="border rounded-xl p-6 shadow hover:bg-gray-50 transition"
+        >
+          <h2 className="text-xl font-semibold mb-2">User Carts</h2>
+          <p className="text-sm text-gray-600">
+            Manage user cart items, remove keep status, or delete items.
+          </p>
+        </Link>
       </div>
     </div>
   );

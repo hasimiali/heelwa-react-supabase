@@ -16,7 +16,7 @@ export default function ProductList({ products }) {
               <img
                 src={primaryImage}
                 alt={p.name}
-                className="w-full h-56 object-cover rounded mb-3"
+                className="w-full aspect-[3/4] object-cover rounded mb-3"
               />
               <h3 className="font-semibold">{p.name}</h3>
               <p className="text-sm text-gray-600">{p.categories?.name}</p>
