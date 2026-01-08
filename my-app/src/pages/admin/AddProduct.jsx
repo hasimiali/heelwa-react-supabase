@@ -43,6 +43,20 @@ export default function ProductsManager() {
   const [importing, setImporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
+  const [importProgress, setImportProgress] = useState({
+    open: false,
+    current: 0,
+    total: 0,
+    status: "",
+  });
+
+  const [imageImportProgress, setImageImportProgress] = useState({
+    open: false,
+    current: 0,
+    total: 0,
+    status: "",
+  });
+
   // ============================
   // AUTO SLUG
   // ============================
@@ -109,14 +123,7 @@ export default function ProductsManager() {
         await supabase.storage.from("product-images").remove(filePaths);
       }
 
-      // 3. Hapus semua variants
-      await supabase.from("product_variants").delete().neq("id", 0);
-
-      // 4. Hapus semua product images (DB)
-      await supabase.from("product_images").delete().neq("id", 0);
-
-      // 5. Hapus semua products
-      await supabase.from("products").delete().neq("id", 0);
+      await supabase.rpc("delete_all_products");
 
       alert("✅ All products deleted successfully");
       fetchAll();
@@ -388,7 +395,7 @@ export default function ProductsManager() {
   };
 
   const handleImportCSV = async (e) => {
-    if (isImporting) return; // 🔒 STOP DOUBLE RUN
+    if (isImporting) return;
     setIsImporting(true);
 
     const file = e.target.files[0];
@@ -416,17 +423,12 @@ export default function ProductsManager() {
           let lastVariant = null;
 
           rows.forEach((row) => {
-            // DETECT PRODUCT ROW
             if (row.name && row.category && row.brand) {
-              grouped[row.name] = {
-                product: row,
-                variants: [],
-              };
+              grouped[row.name] = { product: row, variants: [] };
               lastProduct = row.name;
-              lastVariant = null; // reset variant context
+              lastVariant = null;
             }
 
-            // DETECT VARIANT ROW (walaupun kolom kosong)
             if (lastProduct) {
               const variant = {
                 color: row.color || lastVariant?.color || "",
@@ -436,7 +438,6 @@ export default function ProductsManager() {
                   row.stock_quantity || lastVariant?.stock_quantity || 0,
               };
 
-              // HANYA PUSH JIKA ADA SIZE (atau minimal salah satu)
               if (variant.size) {
                 grouped[lastProduct].variants.push(variant);
                 lastVariant = variant;
@@ -444,26 +445,37 @@ export default function ProductsManager() {
             }
           });
 
-          for (const key of Object.keys(grouped)) {
+          const productKeys = Object.keys(grouped);
+
+          // 🔥 OPEN PROGRESS POPUP
+          setImportProgress({
+            open: true,
+            current: 0,
+            total: productKeys.length,
+            status: "Memulai import...",
+          });
+
+          let index = 0;
+
+          for (const key of productKeys) {
+            index++;
+
+            setImportProgress((p) => ({
+              ...p,
+              current: index,
+              status: `Importing ${key} (${index}/${p.total})`,
+            }));
+
             const { product, variants } = grouped[key];
 
-            const productCategory = (product.category || "").trim();
-            const productBrand = (product.brand || "").trim();
-
-            if (!productCategory || !productBrand) {
-              console.warn("Missing category/brand, skipping:", product);
-              continue;
-            }
-
             const category = categories.find(
-              (c) => c.name.trim() === productCategory
+              (c) => c.name.trim() === product.category.trim()
             );
-            const brand = brands.find((b) => b.name.trim() === productBrand);
+            const brand = brands.find(
+              (b) => b.name.trim() === product.brand.trim()
+            );
 
-            if (!category || !brand) {
-              console.warn("Category or brand not found:", product);
-              continue;
-            }
+            if (!category || !brand) continue;
 
             const slug = product.name
               .toLowerCase()
@@ -471,10 +483,7 @@ export default function ProductsManager() {
               .replace(/(^-|-$)+/g, "");
 
             const basePrice = Number(product.base_price);
-            if (isNaN(basePrice)) {
-              console.warn("Invalid base price:", product.base_price);
-              continue;
-            }
+            if (isNaN(basePrice)) continue;
 
             const { data: prod, error } = await supabase
               .from("products")
@@ -511,9 +520,27 @@ export default function ProductsManager() {
             }
           }
 
+          setImportProgress((p) => ({
+            ...p,
+            status: "✅ Import selesai",
+          }));
+
+          setTimeout(() => {
+            setImportProgress({
+              open: false,
+              current: 0,
+              total: 0,
+              status: "",
+            });
+          }, 1000);
+
           alert("Import CSV berhasil");
         } catch (err) {
           console.error(err);
+          setImportProgress((p) => ({
+            ...p,
+            status: "❌ Import gagal",
+          }));
           alert("Import gagal");
         } finally {
           setIsImporting(false);
@@ -527,86 +554,116 @@ export default function ProductsManager() {
     const file = e.target.files[0];
     if (!file) return;
 
-    const zip = await JSZip.loadAsync(file);
+    try {
+      const zip = await JSZip.loadAsync(file);
 
-    // get products
-    const { data: products, error: productErr } = await supabase
-      .from("products")
-      .select("id, name");
+      const { data: products, error: productErr } = await supabase
+        .from("products")
+        .select("id, name");
 
-    if (productErr || !products?.length) {
-      alert("No products found");
-      return;
-    }
+      if (productErr || !products?.length) {
+        alert("No products found");
+        return;
+      }
 
-    for (const path in zip.files) {
-      const zipFile = zip.files[path];
-
-      // skip folders
-      if (zipFile.dir) continue;
-
-      // only images
-      if (!path.match(/\.(jpg|jpeg|png)$/i)) continue;
-
-      /**
-       * example path:
-       * product_images/Abaya/Adeeva/1.jpg
-       */
-      const parts = path.split("/");
-      const productName = parts[parts.length - 2]; // Adeeva
-
-      const product = products.find(
-        (p) => p.name.toLowerCase() === productName.toLowerCase()
+      // 🔢 hitung total image file
+      const imageFiles = Object.values(zip.files).filter(
+        (f) => !f.dir && f.name.match(/\.(jpg|jpeg|png)$/i)
       );
 
-      if (!product) {
-        console.warn("❌ No product match:", productName);
-        continue;
+      setImageImportProgress({
+        open: true,
+        current: 0,
+        total: imageFiles.length,
+        status: "Preparing images...",
+      });
+
+      let index = 0;
+
+      for (const zipFile of imageFiles) {
+        index++;
+
+        const path = zipFile.name;
+        const parts = path.split("/");
+        const productName = parts[parts.length - 2];
+
+        setImageImportProgress((p) => ({
+          ...p,
+          current: index,
+          status: `Uploading ${productName} (${index}/${p.total})`,
+        }));
+
+        const product = products.find(
+          (p) => p.name.toLowerCase() === productName.toLowerCase()
+        );
+
+        if (!product) {
+          console.warn("❌ No product match:", productName);
+          continue;
+        }
+
+        const blob = await zipFile.async("blob");
+
+        const filePath = `products/${product.id}-${Date.now()}-${index}.jpg`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("product-images")
+          .upload(filePath, blob, { upsert: true });
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          continue;
+        }
+
+        const { data } = supabase.storage
+          .from("product-images")
+          .getPublicUrl(filePath);
+
+        const imageUrl = data.publicUrl;
+
+        const { data: existingImages } = await supabase
+          .from("product_images")
+          .select("id")
+          .eq("product_id", product.id);
+
+        const { error: insertError } = await supabase
+          .from("product_images")
+          .insert({
+            product_id: product.id,
+            image_url: imageUrl,
+            is_primary: !existingImages?.length,
+          });
+
+        if (insertError) {
+          console.error("DB insert error:", insertError);
+        }
       }
 
-      // convert zip file to blob
-      const blob = await zipFile.async("blob");
+      setImageImportProgress((p) => ({
+        ...p,
+        status: "✅ Image import complete",
+      }));
 
-      const filePath = `products/${product.id}-${Date.now()}.jpg`;
-
-      // upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from("product-images")
-        .upload(filePath, blob, { upsert: true });
-
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        continue;
-      }
-
-      // get public url
-      const { data } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(filePath);
-
-      const imageUrl = data.publicUrl;
-
-      // check if product already has images
-      const { data: existingImages } = await supabase
-        .from("product_images")
-        .select("id")
-        .eq("product_id", product.id);
-
-      // insert image record
-      const { error: insertError } = await supabase
-        .from("product_images")
-        .insert({
-          product_id: product.id,
-          image_url: imageUrl,
-          is_primary: existingImages.length === 0, // first image = primary
+      setTimeout(() => {
+        setImageImportProgress({
+          open: false,
+          current: 0,
+          total: 0,
+          status: "",
         });
+      }, 1000);
 
-      if (insertError) {
-        console.error("DB insert error:", insertError);
-      }
+      alert("✅ Images imported successfully");
+    } catch (err) {
+      console.error(err);
+      setImageImportProgress((p) => ({
+        ...p,
+        status: "❌ Import failed",
+      }));
+      alert("❌ Image import failed");
+    } finally {
+      e.target.value = "";
     }
-
-    alert("✅ Images imported successfully");
   };
 
   // ============================
@@ -915,6 +972,59 @@ export default function ProductsManager() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {importProgress.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white w-[360px] p-6 rounded shadow">
+            <h3 className="text-lg font-bold mb-3">Importing CSV</h3>
+
+            <div className="w-full bg-gray-200 rounded h-3 mb-3">
+              <div
+                className="bg-indigo-600 h-3 rounded transition-all"
+                style={{
+                  width: `${
+                    (importProgress.current / importProgress.total) * 100
+                  }%`,
+                }}
+              />
+            </div>
+
+            <p className="text-sm text-gray-700">{importProgress.status}</p>
+
+            <p className="text-xs text-gray-500 mt-1">
+              {importProgress.current} / {importProgress.total} products
+            </p>
+          </div>
+        </div>
+      )}
+
+      {imageImportProgress.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white w-[360px] p-6 rounded shadow">
+            <h3 className="text-lg font-bold mb-3">Importing Images</h3>
+
+            <div className="w-full bg-gray-200 rounded h-3 mb-3">
+              <div
+                className="bg-green-600 h-3 rounded transition-all"
+                style={{
+                  width: `${
+                    (imageImportProgress.current / imageImportProgress.total) *
+                    100
+                  }%`,
+                }}
+              />
+            </div>
+
+            <p className="text-sm text-gray-700">
+              {imageImportProgress.status}
+            </p>
+
+            <p className="text-xs text-gray-500 mt-1">
+              {imageImportProgress.current} / {imageImportProgress.total} images
+            </p>
           </div>
         </div>
       )}

@@ -36,7 +36,8 @@ export default function ProductsGrid() {
       )
 
       .eq("is_active", true)
-      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+
       .range(from, to);
 
     if (error) {
@@ -62,7 +63,7 @@ export default function ProductsGrid() {
     <div className="bg-white py-14">
       <div className="mb-10 text-center">
         <h2 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">
-          Our Products
+          Heelwa Raya Series 2026
         </h2>
         <p className="mt-3 text-gray-600">
           Gracefully designed essentials for modern Muslimah

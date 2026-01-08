@@ -1,12 +1,15 @@
 import { useParams } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
 export default function ProductOverview() {
+  const navigate = useNavigate();
+
   const { slug } = useParams();
 
   const [product, setProduct] = useState(null);
@@ -34,7 +37,26 @@ export default function ProductOverview() {
         .eq("slug", slug)
         .single();
 
-      if (!error) setProduct(data);
+      if (!error && data) {
+        setProduct(data);
+
+        // ===== DEFAULT VARIANT =====
+        if (data.product_variants?.length > 0) {
+          const firstVariant = data.product_variants[0];
+
+          setSelectedColor(firstVariant.color);
+
+          // ambil size pertama yang stok > 0 untuk warna tersebut
+          const firstSizeInStock = data.product_variants.find(
+            (v) => v.color === firstVariant.color && v.stock_quantity > 0
+          );
+
+          if (firstSizeInStock) {
+            setSelectedSize(firstSizeInStock.size);
+          }
+        }
+      }
+
       setLoading(false);
     }
 
@@ -77,8 +99,10 @@ export default function ProductOverview() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      alert("Silakan login terlebih dahulu");
       setAdding(false);
+      navigate("/register", {
+        state: { from: `/products/${slug}` },
+      });
       return;
     }
 
@@ -131,7 +155,7 @@ export default function ProductOverview() {
       });
     }
 
-    alert("Produk berhasil ditambahkan ke cart 🛒");
+    navigate("/shoppingcart");
     setAdding(false);
   }
 
@@ -231,7 +255,7 @@ export default function ProductOverview() {
             disabled={!selectedColor || !selectedSize || adding}
             className="mt-10 w-full bg-indigo-600 text-white py-3 rounded-md disabled:opacity-50"
           >
-            {adding ? "Adding..." : "Add to cart"}
+            {adding ? "Adding..." : "Tambahkan ke keranjang"}
           </button>
         </div>
       </div>

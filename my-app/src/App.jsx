@@ -18,7 +18,9 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AddBrands from "./pages/admin/AddBrands";
 import AddCategories from "./pages/admin/AddCategories";
 import AddProduct from "./pages/admin/AddProduct";
-import AdminUserCarts from "./pages/admin/AdminUserCarts";
+import AdminKasir from "./pages/admin/AdminKasir";
+import AdminStockVariants from "./pages/admin/AdminStockVariants";
+import AdminInventoryLog from "./pages/admin/AdminInventoryLog";
 
 function App() {
   const { user, role, loading } = useAuth();
@@ -42,13 +44,14 @@ function App() {
         <Route path="/category/:id" element={<ProductPage />} />
         <Route path="/products/:slug" element={<ProductOverview />} />
         <Route path="/search" element={<Search />} />
-
         {/* Admin */}
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/brands" element={<AddBrands />} />
         <Route path="/admin/categories" element={<AddCategories />} />
         <Route path="/admin/product" element={<AddProduct />} />
-        <Route path="/admin/usercart" element={<AdminUserCarts />} />
+        <Route path="/admin/kasir" element={<AdminKasir />} />
+        <Route path="/admin/stocks" element={<AdminStockVariants />} />
+        <Route path="/admin/inventory-log" element={<AdminInventoryLog />} />
       </Routes>
     </Router>
   );

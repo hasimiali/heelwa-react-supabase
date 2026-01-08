@@ -10,7 +10,7 @@ export default function Home() {
     <div>
       <Hero />
       <HeelwaIntro />
-      <CategoriesHero />
+      {/* <CategoriesHero /> */}
       <ProductHero />
       <Footer />
     </div>

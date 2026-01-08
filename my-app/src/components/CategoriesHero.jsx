@@ -19,20 +19,42 @@ export default function CategoriesHero() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     const loadCategories = async () => {
+      setLoading(true);
+
       const { data, error } = await supabase
         .from("categories")
-        .select("*") // SAME AS NAVBAR
-        .is("parent_id", null) // parent categories only
+        .select("*")
+        .is("parent_id", null)
         .order("name");
 
-      console.log("CategoriesHero:", data, error);
+      if (!mounted) return;
 
-      if (!error) setCategories(data || []);
+      if (!error) {
+        setCategories(data || []);
+      }
+
       setLoading(false);
     };
 
+    // INITIAL LOAD
     loadCategories();
+
+    // REFETCH ON TAB SWITCH / FOCUS
+    const handleFocus = () => {
+      loadCategories();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
   }, []);
 
   /* ---------------- LOADING STATE ---------------- */

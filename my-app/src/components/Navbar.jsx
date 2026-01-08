@@ -39,7 +39,9 @@ export default function Navbar() {
     "/admin/product",
     "/admin/categories",
     "/admin/products",
-    "/admin/usercart",
+    "/admin/kasir",
+    "/admin/stocks",
+    "/admin/inventory-log",
     "/products/",
     "/products/new-in",
   ];
@@ -55,45 +57,83 @@ export default function Navbar() {
   // LOAD USER + CATEGORIES
   // ==============================
   useEffect(() => {
-    const loadUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    let mounted = true;
 
-      if (!session?.user) {
+    // ==============================
+    // LOAD USER (FORCES NETWORK CALL)
+    // ==============================
+    const loadUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+
+      if (!mounted) return;
+
+      if (error || !data?.user) {
         setUser(null);
         return;
       }
 
-      let userData = session.user;
+      let userData = data.user;
 
       const { data: roleData } = await supabase
         .from("profiles")
         .select("role")
-        .eq("id", session.user.id)
+        .eq("id", data.user.id)
         .single();
 
-      if (roleData) userData = { ...userData, role: roleData.role };
+      if (!mounted) return;
+
+      if (roleData) {
+        userData = { ...userData, role: roleData.role };
+      }
+
       setUser(userData);
     };
 
+    // ==============================
+    // LOAD CATEGORIES (ONCE)
+    // ==============================
     const loadCategories = async () => {
       const { data } = await supabase
         .from("categories")
         .select("*")
         .order("name");
 
+      if (!mounted) return;
       setCategories(data || []);
     };
 
+    // INITIAL LOAD
     loadUser();
     loadCategories();
 
+    // ==============================
+    // AUTH STATE LISTENER
+    // ==============================
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(loadUser);
+    } = supabase.auth.onAuthStateChange(() => {
+      loadUser(); // login / logout / token refresh
+    });
 
-    return () => subscription.unsubscribe();
+    // ==============================
+    // TAB SWITCH / WINDOW FOCUS
+    // ==============================
+    const handleFocus = () => {
+      loadUser(); // revalidate session
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    // ==============================
+    // CLEANUP
+    // ==============================
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
   }, []);
 
   // ==============================
@@ -188,13 +228,17 @@ export default function Navbar() {
             className={`w-6 h-6 cursor-pointer ${
               whiteMode ? "text-black" : "text-white"
             }`}
-            onClick={() => (user ? navigate("/profile") : navigate("/login"))}
+            onClick={() =>
+              user ? navigate("/profile") : navigate("/register")
+            }
           />
-          <Link to="/shoppingcart">
-            <ShoppingCartIcon
-              className={`w-6 h-6 ${whiteMode ? "text-black" : "text-white"}`}
-            />
-          </Link>
+          {user && (
+            <Link to="/shoppingcart">
+              <ShoppingCartIcon
+                className={`w-6 h-6 ${whiteMode ? "text-black" : "text-white"}`}
+              />
+            </Link>
+          )}
         </div>
       </div>
 
@@ -269,13 +313,17 @@ export default function Navbar() {
             className={`w-6 h-6 cursor-pointer ${
               whiteMode ? "text-black" : "text-white"
             }`}
-            onClick={() => (user ? navigate("/profile") : navigate("/login"))}
+            onClick={() =>
+              user ? navigate("/profile") : navigate("/register")
+            }
           />
-          <Link to="/shoppingcart">
-            <ShoppingCartIcon
-              className={`w-6 h-6 ${whiteMode ? "text-black" : "text-white"}`}
-            />
-          </Link>
+          {user && (
+            <Link to="/shoppingcart">
+              <ShoppingCartIcon
+                className={`w-6 h-6 ${whiteMode ? "text-black" : "text-white"}`}
+              />
+            </Link>
+          )}
         </div>
       </div>
     </div>
