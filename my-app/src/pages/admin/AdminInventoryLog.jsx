@@ -15,32 +15,34 @@ export default function AdminInventoryLog() {
   async function loadLogs() {
     setLoading(true);
 
-    let query = supabase
-      .from("inventory_log")
-      .select(
-        `
-  id,
-  transaction_id,
-  change_type,
-  quantity_change,
-  payment_method,
-  created_at,
-  product_variants (
-    sku,
-    color,
-    size,
-    products ( name )
-  ),
-  cashier:profiles!inventory_log_cashier_id_fkey (
-    username
-  ),
-  customer:profiles!inventory_log_customer_id_fkey (
-    username
-  )
-`
+let query = supabase
+  .from("inventory_log")
+  .select(
+    `
+      id,
+      transaction_id,
+      change_type,
+      quantity_change,
+      payment_method,
+      created_at,
+      product_variants (
+        sku,
+        color,
+        size,
+        price,
+        products ( name )
+      ),
+      cashier:profiles!inventory_log_cashier_id_fkey (
+        username
+      ),
+      customer:profiles!inventory_log_customer_id_fkey (
+        username
       )
+    `
+  )
+  .eq("change_type", "sale") // ✅ HANYA SALE
+  .order("created_at", { ascending: false });
 
-      .order("created_at", { ascending: false });
 
     if (filter !== "all") {
       query = query.eq("change_type", filter);
@@ -97,10 +99,48 @@ export default function AdminInventoryLog() {
     return <p className="p-6">Loading inventory log...</p>;
   }
 
+const totalItemSold = logs.reduce((sum, trx) => {
   return (
-    <div className="p-6">
+    sum +
+    trx.items.reduce(
+      (s, item) => s + Math.abs(item.quantity_change),
+      0
+    )
+  );
+}, 0);
+
+const totalRevenue = logs.reduce((sum, trx) => {
+  return (
+    sum +
+    trx.items.reduce(
+      (s, item) =>
+        s +
+        Math.abs(item.quantity_change) *
+          (item.product_variants?.price || 0),
+      0
+    )
+  );
+}, 0);
+
+  return (
+    <div className="p-6 py-25">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Inventory Log</h1>
+
+<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div className="border rounded-lg p-4 bg-white">
+    <div className="text-sm text-gray-500">Total Item Terjual</div>
+    <div className="text-2xl font-bold">{totalItemSold}</div>
+  </div>
+
+  <div className="border rounded-lg p-4 bg-white">
+    <div className="text-sm text-gray-500">Total Penjualan</div>
+    <div className="text-2xl font-bold">
+      Rp {totalRevenue.toLocaleString()}
+    </div>
+  </div>
+</div>
+
 
         {/* FILTER */}
         <select
@@ -165,9 +205,10 @@ export default function AdminInventoryLog() {
                     <td className="border p-2 text-center">
                       {item.product_variants?.sku}
                     </td>
-                    <td className="border p-2 text-center font-semibold">
-                      {item.quantity_change}
-                    </td>
+                      <td className="border p-2 text-center font-semibold">
+                        {Math.abs(item.quantity_change)}
+                      </td>
+
                   </tr>
                 ))}
               </tbody>

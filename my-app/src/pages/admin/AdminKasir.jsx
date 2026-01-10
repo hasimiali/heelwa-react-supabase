@@ -17,6 +17,8 @@ export default function AdminUserCarts() {
   const [userSearch, setUserSearch] = useState("");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [userKeepCount, setUserKeepCount] = useState({});
+
 
   // ==========================
   // LOAD USERS
@@ -39,16 +41,41 @@ export default function AdminUserCarts() {
     setCashier(user);
   }
 
-  async function loadUsers() {
-    setLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username")
-      .order("username", { ascending: true });
+async function loadUsers() {
+  setLoading(true);
 
-    setUsers(data || []);
+  // 1. Ambil users
+  const { data: usersData } = await supabase
+    .from("profiles")
+    .select("id, username")
+    .order("username", { ascending: true });
+
+  if (!usersData) {
+    setUsers([]);
     setLoading(false);
+    return;
   }
+
+  // 2. Ambil cart + cart_items keep
+  const { data: carts } = await supabase
+    .from("carts")
+    .select(`
+      user_id,
+      cart_items ( id )
+    `)
+    .eq("cart_items.keep", true);
+
+  // 3. Hitung jumlah keep per user
+  const keepCount = {};
+  carts?.forEach((cart) => {
+    keepCount[cart.user_id] = cart.cart_items.length;
+  });
+
+  setUsers(usersData);
+  setUserKeepCount(keepCount);
+  setLoading(false);
+}
+
 
   async function searchVariants() {
     const { data } = await supabase
@@ -357,9 +384,25 @@ export default function AdminUserCarts() {
 
   if (loading) return <p className="p-6">Loading...</p>;
 
-  const filteredUsers = users.filter((u) =>
+const filteredUsers = users
+  .filter((u) =>
     (u.username || "").toLowerCase().includes(userSearch.toLowerCase())
-  );
+  )
+  .sort((a, b) => {
+    const keepA = userKeepCount[a.id] || 0;
+    const keepB = userKeepCount[b.id] || 0;
+
+    // 1️⃣ Prioritaskan yang punya KEEP
+    if (keepA > 0 && keepB === 0) return -1;
+    if (keepA === 0 && keepB > 0) return 1;
+
+    // 2️⃣ Jika sama-sama punya KEEP → urut jumlah terbanyak
+    if (keepA !== keepB) return keepB - keepA;
+
+    // 3️⃣ Fallback: urut username
+    return (a.username || "").localeCompare(b.username || "");
+  });
+
 
   return (
     <div className="p-6">
@@ -380,17 +423,30 @@ export default function AdminUserCarts() {
 
           <ul className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
             {filteredUsers.map((u) => (
-              <li
-                key={u.id}
-                onClick={() => loadUserCart(u.id)}
-                className={`cursor-pointer rounded px-3 py-2 text-sm ${
-                  selectedUser === u.id
-                    ? "bg-indigo-600 text-white"
-                    : "hover:bg-gray-100"
-                }`}
-              >
-                {u.username || "(tanpa username)"}
-              </li>
+<li
+  key={u.id}
+  onClick={() => loadUserCart(u.id)}
+  className={`cursor-pointer rounded px-3 py-2 text-sm flex justify-between items-center ${
+    selectedUser === u.id
+      ? "bg-indigo-600 text-white"
+      : "hover:bg-gray-100"
+  }`}
+>
+  <span>{u.username || "(tanpa username)"}</span>
+
+  {userKeepCount[u.id] > 0 && (
+    <span
+      className={`text-xs px-2 py-0.5 rounded-full ${
+        selectedUser === u.id
+          ? "bg-white text-indigo-600"
+          : "bg-indigo-600 text-white"
+      }`}
+    >
+      {userKeepCount[u.id]}
+    </span>
+  )}
+</li>
+
             ))}
           </ul>
         </div>

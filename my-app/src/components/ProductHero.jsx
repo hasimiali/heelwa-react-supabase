@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { formatRupiah } from "../utils/formatRupiah";
@@ -10,6 +10,7 @@ export default function ProductsGrid() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const fetchedOnce = useRef(false);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -55,9 +56,12 @@ export default function ProductsGrid() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+useEffect(() => {
+  if (fetchedOnce.current) return;
+  fetchedOnce.current = true;
+
+  fetchProducts();
+}, []);
 
   return (
     <div className="bg-white py-14">
